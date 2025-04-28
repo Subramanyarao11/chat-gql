@@ -1,16 +1,23 @@
-import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, Mutation, Query, Resolver, Subscription } from '@nestjs/graphql';
 import { MessagesService } from './messages.service';
 import { Message } from './entities/message.entity';
-import { UseGuards } from '@nestjs/common';
+import { Inject, UseGuards } from '@nestjs/common';
 import { GqlAuthGuard } from '../../auth/guards/gql-auth.guard';
 import { CreateMessageInput } from './dto/create-message.input';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { TokenPayload } from '../../auth/token-payload.interface';
 import { GetMessagesArgs } from '../dto/get-messages-args';
+import { PUB_SUB } from 'src/common/pubsub/injection-token';
+import { PubSub } from 'graphql-subscriptions';
+import { MessageCreatedArgs } from './dto/message-created.args';
+import { MESSAGE_CREATED } from './constants/pub-sub-triggers';
 
 @Resolver(() => Message)
 export class MessagesResolver {
-  constructor(private readonly messagesService: MessagesService) {}
+  constructor(
+    private readonly messagesService: MessagesService,
+    @Inject(PUB_SUB) private readonly pubSub: PubSub,
+  ) {}
 
   @Mutation(() => Message)
   @UseGuards(GqlAuthGuard)
@@ -28,5 +35,15 @@ export class MessagesResolver {
     @CurrentUser() user: TokenPayload,
   ) {
     return this.messagesService.getMessages(getMessageArgs, user._id);
+  }
+
+  // this is subscriped to same topic i,e. MESSAGE_CREATED to which the message is published whenever a message is created from service, here filter is used to filter the messages based on the chatId and asyncIterableIterator is used to fan out the messages to the client
+  @Subscription(() => Message, {
+    filter: (payload, variables) => {
+      return payload.messageCreated.chatId === variables.chatId;
+    },
+  })
+  messageCreated(@Args() _messageCreatedArgs: MessageCreatedArgs) {
+    return this.pubSub.asyncIterableIterator(MESSAGE_CREATED);
   }
 }

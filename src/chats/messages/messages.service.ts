@@ -1,18 +1,25 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ChatsRepository } from '../chats.repository';
 import { CreateMessageInput } from './dto/create-message.input';
 import { Message } from './entities/message.entity';
 import { Types } from 'mongoose';
 import { GetMessagesArgs } from '../dto/get-messages-args';
+import { PUB_SUB } from 'src/common/pubsub/injection-token';
+import { PubSub } from 'graphql-subscriptions';
+import { MESSAGE_CREATED } from './constants/pub-sub-triggers';
 
 @Injectable()
 export class MessagesService {
-  constructor(private readonly chatsRepository: ChatsRepository) {}
+  constructor(
+    private readonly chatsRepository: ChatsRepository,
+    @Inject(PUB_SUB) private readonly pubSub: PubSub,
+  ) {}
 
   async createMessage({ content, chatId }: CreateMessageInput, userId: string) {
     const message: Message = {
       content,
       userId,
+      chatId,
       createdAt: new Date(),
       _id: new Types.ObjectId(),
     };
@@ -27,6 +34,10 @@ export class MessagesService {
         },
       },
     );
+    // message whenever created is published to the topic of MESSAGE_CREATED
+    await this.pubSub.publish(MESSAGE_CREATED, {
+      messageCreated: message,
+    });
     return message;
   }
 
