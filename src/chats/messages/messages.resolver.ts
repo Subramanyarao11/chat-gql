@@ -39,11 +39,18 @@ export class MessagesResolver {
 
   // this is subscriped to same topic i,e. MESSAGE_CREATED to which the message is published whenever a message is created from service, here filter is used to filter the messages based on the chatId and asyncIterableIterator is used to fan out the messages to the client
   @Subscription(() => Message, {
-    filter: (payload, variables) => {
-      return payload.messageCreated.chatId === variables.chatId;
+    filter: (payload, variables, context) => {
+      const userId = context.req.user._id;
+      return (
+        payload.messageCreated.chatId === variables.chatId &&
+        userId !== payload.messageCreated.userId
+      );
     },
   })
-  messageCreated(@Args() _messageCreatedArgs: MessageCreatedArgs) {
-    return this.pubSub.asyncIterableIterator(MESSAGE_CREATED);
+  messageCreated(
+    @Args() messageCreatedArgs: MessageCreatedArgs,
+    @CurrentUser() user: TokenPayload,
+  ) {
+    return this.messagesService.messageCreated(messageCreatedArgs, user._id);
   }
 }

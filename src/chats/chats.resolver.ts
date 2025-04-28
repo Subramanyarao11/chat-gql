@@ -21,11 +21,11 @@ export class ChatsResolver {
     return this.chatsService.create(createChatInput, user._id);
   }
 
+  @UseGuards(GqlAuthGuard)
   @Query(() => [Chat], { name: 'chats' })
-  findAll() {
-    return this.chatsService.findAll();
+  findAll(@CurrentUser() user: TokenPayload) {
+    return this.chatsService.findAll(user._id);
   }
-
   @Query(() => Chat, { name: 'chat' })
   findOne(@Args('_id') _id: string) {
     return this.chatsService.findOne(_id);
