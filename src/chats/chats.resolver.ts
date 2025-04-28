@@ -1,33 +1,43 @@
-import { Injectable } from '@nestjs/common';
+import { Resolver, Query, Mutation, Args, Int } from '@nestjs/graphql';
+import { ChatsService } from './chats.service';
+import { Chat } from './entities/chat.entity';
 import { CreateChatInput } from './dto/create-chat.input';
 import { UpdateChatInput } from './dto/update-chat.input';
-import { ChatsRepository } from './chats.repository';
+import { UseGuards } from '@nestjs/common';
+import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { TokenPayload } from '../auth/token-payload.interface';
 
-@Injectable()
-export class ChatsService {
-  constructor(private readonly chatsRepository: ChatsRepository) {}
+@Resolver(() => Chat)
+export class ChatsResolver {
+  constructor(private readonly chatsService: ChatsService) {}
 
-  async create(createChatInput: CreateChatInput, userId: string) {
-    return this.chatsRepository.create({
-      ...createChatInput,
-      userId,
-      userIds: createChatInput.userIds || [],
-    });
+  @UseGuards(GqlAuthGuard)
+  @Mutation(() => Chat)
+  createChat(
+    @Args('createChatInput') createChatInput: CreateChatInput,
+    @CurrentUser() user: TokenPayload,
+  ) {
+    return this.chatsService.create(createChatInput, user._id);
   }
 
+  @Query(() => [Chat], { name: 'chats' })
   findAll() {
-    return `This action returns all chats`;
+    return this.chatsService.findAll();
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} chat`;
+  @Query(() => Chat, { name: 'chat' })
+  findOne(@Args('_id') _id: string) {
+    return this.chatsService.findOne(_id);
   }
 
-  update(id: number, updateChatInput: UpdateChatInput) {
-    return `This action updates a #${id} chat`;
+  @Mutation(() => Chat)
+  updateChat(@Args('updateChatInput') updateChatInput: UpdateChatInput) {
+    return this.chatsService.update(updateChatInput.id, updateChatInput);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} chat`;
+  @Mutation(() => Chat)
+  removeChat(@Args('id', { type: () => Int }) id: number) {
+    return this.chatsService.remove(id);
   }
 }
